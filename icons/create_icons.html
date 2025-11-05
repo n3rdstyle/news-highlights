@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas16" width="16" height="16"></canvas>
+  <canvas id="canvas48" width="48" height="48"></canvas>
+  <canvas id="canvas128" width="128" height="128"></canvas>
+  <script>
+    function createIcon(canvasId, size) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      
+      // Background gradient
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#4A90E2');
+      gradient.addColorStop(1, '#357ABD');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, size, size);
+      
+      // Bookmark icon
+      ctx.fillStyle = 'white';
+      const padding = size * 0.2;
+      const width = size * 0.6;
+      const height = size * 0.7;
+      const x = padding;
+      const y = padding;
+      
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + width, y);
+      ctx.lineTo(x + width, y + height);
+      ctx.lineTo(x + width / 2, y + height * 0.8);
+      ctx.lineTo(x, y + height);
+      ctx.closePath();
+      ctx.fill();
+    }
+    
+    createIcon('canvas16', 16);
+    createIcon('canvas48', 48);
+    createIcon('canvas128', 128);
+    
+    console.log('Icons created in canvas elements');
+    console.log('To save: Right-click each canvas and save as PNG');
+  </script>
+</body>
+</html>
