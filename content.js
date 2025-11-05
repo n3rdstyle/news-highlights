@@ -81,6 +81,11 @@ function handleSaveHighlight(e) {
     updated_at: new Date().toISOString()
   };
 
+  // Auto-tag with "Statistics" if the text contains statistics
+  if (containsStatistics(selectedText)) {
+    item.collections.push('Statistics');
+  }
+
   console.log('Created item:', item);
 
   // Show collection selection dialog
@@ -91,6 +96,32 @@ function handleSaveHighlight(e) {
 function generateId() {
   return Math.random().toString(36).substring(2, 15) +
          Math.random().toString(36).substring(2, 15);
+}
+
+// Detect if text contains statistics
+function containsStatistics(text) {
+  // Check for various statistical patterns:
+  // - Percentages (e.g., 50%, 23.5%)
+  // - Numbers with units (e.g., $100, 5 million, 3.2 billion)
+  // - Ratios (e.g., 3:1, 5/10)
+  // - Decimal numbers (e.g., 3.14, 0.5)
+  // - Large numbers (e.g., 1,000, 10,000)
+  // - Statistical terms
+
+  const patterns = [
+    /\d+\.?\d*%/,                           // Percentages: 50%, 23.5%
+    /\$\d+[\d,]*/,                          // Currency: $100, $1,000
+    /\d+[\d,]*\s*(million|billion|trillion|thousand)/i, // Large numbers
+    /\d+:\d+/,                              // Ratios: 3:1
+    /\d+\/\d+/,                             // Fractions: 5/10
+    /\d{1,3}(,\d{3})+(\.\d+)?/,            // Comma-separated numbers: 1,000 or 1,000.50
+    /\d+\.\d+/,                             // Decimal numbers: 3.14
+    /\b\d+\s*(years?|months?|days?|hours?|minutes?|seconds?)\b/i, // Time units
+    /(average|mean|median|total|sum|count|rate|growth|increase|decrease|decline)\s+of\s+\d+/i, // Statistical terms with numbers
+    /\b(approximately|roughly|about|around)\s+\d+/i // Approximate numbers
+  ];
+
+  return patterns.some(pattern => pattern.test(text));
 }
 
 // Show dialog for selecting collections/tags
@@ -104,7 +135,7 @@ function showCollectionDialog(item) {
       <div class="source">From: ${new URL(item.source_url).hostname}</div>
       <div class="form-group">
         <label for="collections-input">Collections (comma-separated):</label>
-        <input type="text" id="collections-input" placeholder="e.g., Technology, News, Research" />
+        <input type="text" id="collections-input" placeholder="e.g., Technology, News, Research" value="${item.collections.join(', ')}" />
       </div>
       <div class="form-actions">
         <button id="cancel-btn" class="btn-secondary">Cancel</button>
