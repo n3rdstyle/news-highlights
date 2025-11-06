@@ -47,6 +47,24 @@ function setupContextMenu() {
   });
 }
 
+// Detect if text contains statistics
+function containsStatistics(text) {
+  const patterns = [
+    /\d+\.?\d*%/,                           // Percentages: 50%, 23.5%
+    /\$\d+[\d,]*/,                          // Currency: $100, $1,000
+    /\d+[\d,]*\s*(million|billion|trillion|thousand)/i, // Large numbers
+    /\d+:\d+/,                              // Ratios: 3:1
+    /\d+\/\d+/,                             // Fractions: 5/10
+    /\d{1,3}(,\d{3})+(\.\d+)?/,            // Comma-separated numbers: 1,000 or 1,000.50
+    /\d+\.\d+/,                             // Decimal numbers: 3.14
+    /\b\d+\s*(years?|months?|days?|hours?|minutes?|seconds?)\b/i, // Time units
+    /(average|mean|median|total|sum|count|rate|growth|increase|decrease|decline)\s+of\s+\d+/i, // Statistical terms with numbers
+    /\b(approximately|roughly|about|around)\s+\d+/i // Approximate numbers
+  ];
+
+  return patterns.some(pattern => pattern.test(text));
+}
+
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'save-highlight' && info.selectionText) {
@@ -62,6 +80,11 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
+
+    // Auto-tag with "Statistics" if the text contains statistics
+    if (containsStatistics(info.selectionText)) {
+      item.collections.push('Statistics');
+    }
 
     saveItem(item);
   }

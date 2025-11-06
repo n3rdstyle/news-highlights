@@ -53,6 +53,60 @@ class AIClusteringService {
     }
   }
 
+  // Detect which items contain statistics using AI
+  async detectStatistics(items) {
+    console.log('[AI] detectStatistics() called with', items.length, 'items');
+
+    if (!items || items.length === 0) {
+      console.log('[AI] No items provided - returning empty array');
+      return [];
+    }
+
+    console.log('[AI] Initializing AI session...');
+    const session = await this.initSession();
+    console.log('[AI] Session initialized:', session);
+
+    // Analyze items in batches to avoid token limits
+    const statisticsItems = [];
+
+    console.log('[AI] Starting to analyze items one by one...');
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      const preview = item.value.substring(0, 300);
+
+      console.log(`[AI] Analyzing item ${idx + 1}/${items.length}: "${preview.substring(0, 50)}..."`);
+
+      const prompt = `Does this text contain statistical data, numbers, percentages, or quantitative information?
+
+Text: "${preview}"
+
+Answer with ONLY "yes" or "no" (no explanation needed).`;
+
+      console.log(`[AI] Sending prompt to AI...`);
+
+      try {
+        const response = await session.prompt(prompt);
+        console.log(`[AI] Response received: "${response}"`);
+
+        const answer = response.trim().toLowerCase();
+        console.log(`[AI] Cleaned answer: "${answer}"`);
+
+        if (answer.includes('yes')) {
+          statisticsItems.push(item);
+          console.log(`[AI] ✓ YES - Statistics detected in: "${preview.substring(0, 50)}..."`);
+        } else {
+          console.log(`[AI] ✗ NO - No statistics in: "${preview.substring(0, 50)}..."`);
+        }
+      } catch (error) {
+        console.error('[AI] ERROR analyzing item for statistics:', error);
+        console.error('[AI] Error stack:', error.stack);
+      }
+    }
+
+    console.log(`[AI] Analysis complete. Found statistics in ${statisticsItems.length} items`);
+    return statisticsItems;
+  }
+
   // Cluster items into collections
   async clusterItems(items) {
     if (!items || items.length === 0) {
