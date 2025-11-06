@@ -79,8 +79,6 @@ function setupEventListeners() {
   document.getElementById('import-file-input').addEventListener('change', importData);
 
   document.getElementById('ai-cluster-btn').addEventListener('click', startAIClustering);
-
-  document.getElementById('analyze-stats-btn').addEventListener('click', analyzeStatistics);
 }
 
 // Filter and display items
@@ -590,45 +588,4 @@ async function applySuggestedCollections(suggestedCollections) {
 function truncateText(text, maxLength) {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';
-}
-
-// Analyze and tag statistics in existing highlights
-async function analyzeStatistics() {
-  console.log('Analyzing statistics in existing highlights...');
-
-  if (allItems.length === 0) {
-    alert('No highlights to analyze. Save some highlights first!');
-    return;
-  }
-
-  // Show loading state
-  const btn = document.getElementById('analyze-stats-btn');
-  const originalHTML = btn.innerHTML;
-  btn.innerHTML = '<span style="animation: spin 1s linear infinite; display: inline-block;">⏳</span>';
-  btn.disabled = true;
-
-  try {
-    const response = await new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: 'analyzeStatistics' }, resolve);
-    });
-
-    if (response.success) {
-      if (response.count > 0) {
-        await loadItems();
-        await loadCollections();
-        alert(`Successfully tagged ${response.count} highlight${response.count !== 1 ? 's' : ''} with "Statistics"!`);
-      } else {
-        alert('No highlights with statistics found, or all statistics highlights are already tagged.');
-      }
-    } else {
-      alert(`Error analyzing statistics: ${response.error}`);
-    }
-  } catch (error) {
-    console.error('Error analyzing statistics:', error);
-    alert(`Error analyzing statistics: ${error.message}`);
-  } finally {
-    // Restore button state
-    btn.innerHTML = originalHTML;
-    btn.disabled = false;
-  }
 }

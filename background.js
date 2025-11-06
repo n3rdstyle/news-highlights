@@ -209,14 +209,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ error: error.message });
     });
     return true;
-  } else if (request.action === 'analyzeStatistics') {
-    // Analyze existing highlights and add "Statistics" tag
-    analyzeAndTagStatistics().then((count) => {
-      sendResponse({ success: true, count });
-    }).catch((error) => {
-      sendResponse({ success: false, error: error.message });
-    });
-    return true;
   }
 });
 
@@ -317,33 +309,4 @@ async function getCollections() {
 function generateId() {
   return Math.random().toString(36).substring(2, 15) +
          Math.random().toString(36).substring(2, 15);
-}
-
-// Analyze existing highlights and add "Statistics" tag
-async function analyzeAndTagStatistics() {
-  const data = await chrome.storage.local.get(['hspProfile']);
-  const profile = data.hspProfile;
-  let taggedCount = 0;
-
-  if (!profile.content.preferences.items) {
-    return 0;
-  }
-
-  profile.content.preferences.items.forEach(item => {
-    if (containsStatistics(item.value)) {
-      // Only add if not already tagged
-      if (!item.collections.includes('Statistics')) {
-        item.collections.push('Statistics');
-        item.updated_at = new Date().toISOString();
-        taggedCount++;
-      }
-    }
-  });
-
-  if (taggedCount > 0) {
-    profile.updated_at = new Date().toISOString();
-    await chrome.storage.local.set({ hspProfile: profile });
-  }
-
-  return taggedCount;
 }
