@@ -53,6 +53,42 @@ class AIClusteringService {
     }
   }
 
+  // Detect which items contain statistics using AI
+  async detectStatistics(items) {
+    if (!items || items.length === 0) {
+      return [];
+    }
+
+    const session = await this.initSession();
+
+    // Analyze items in batches to avoid token limits
+    const statisticsItems = [];
+
+    for (const item of items) {
+      const preview = item.value.substring(0, 300);
+
+      const prompt = `Does this text contain statistical data, numbers, percentages, or quantitative information?
+
+Text: "${preview}"
+
+Answer with ONLY "yes" or "no" (no explanation needed).`;
+
+      try {
+        const response = await session.prompt(prompt);
+        const answer = response.trim().toLowerCase();
+
+        if (answer.includes('yes')) {
+          statisticsItems.push(item);
+          console.log(`✓ Statistics detected in: "${preview.substring(0, 50)}..."`);
+        }
+      } catch (error) {
+        console.error('Error analyzing item for statistics:', error);
+      }
+    }
+
+    return statisticsItems;
+  }
+
   // Cluster items into collections
   async clusterItems(items) {
     if (!items || items.length === 0) {

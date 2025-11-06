@@ -414,44 +414,40 @@ function formatDate(dateString) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// Detect if text contains statistics
-function containsStatistics(text) {
-  const patterns = [
-    /\d+\.?\d*%/,                           // Percentages: 50%, 23.5%
-    /\$\d+[\d,]*/,                          // Currency: $100, $1,000
-    /\d+[\d,]*\s*(million|billion|trillion|thousand)/i, // Large numbers
-    /\d+:\d+/,                              // Ratios: 3:1
-    /\d+\/\d+/,                             // Fractions: 5/10
-    /\d{1,3}(,\d{3})+(\.\d+)?/,            // Comma-separated numbers: 1,000 or 1,000.50
-    /\d+\.\d+/,                             // Decimal numbers: 3.14
-    /\b\d+\s*(years?|months?|days?|hours?|minutes?|seconds?)\b/i, // Time units
-    /(average|mean|median|total|sum|count|rate|growth|increase|decrease|decline)\s+of\s+\d+/i, // Statistical terms with numbers
-    /\b(approximately|roughly|about|around)\s+\d+/i // Approximate numbers
-  ];
-  return patterns.some(pattern => pattern.test(text));
-}
-
-// Tag all items that contain statistics
-async function tagStatisticsInAllItems() {
+// Tag all items that contain statistics using AI detection
+async function tagStatisticsInAllItems(aiService) {
   let taggedCount = 0;
 
-  for (const item of allItems) {
-    if (containsStatistics(item.value)) {
-      // Only add if not already tagged
-      if (!item.collections.includes('Statistics')) {
-        item.collections.push('Statistics');
+  console.log('Detecting statistics using AI...');
 
-        // Update the item in storage
-        await new Promise((resolve) => {
-          chrome.runtime.sendMessage({ action: 'updateItem', item }, (response) => {
-            if (response?.success) {
-              taggedCount++;
-            }
-            resolve();
-          });
-        });
-      }
-    }
+  // Get items that don't already have Statistics tag
+  const itemsToCheck = allItems.filter(item => !item.collections.includes('Statistics'));
+
+  if (itemsToCheck.length === 0) {
+    console.log('All items already have Statistics tag');
+    return 0;
+  }
+
+  console.log(`Checking ${itemsToCheck.length} items for statistics...`);
+
+  // Use AI to detect statistics
+  const statisticsItems = await aiService.detectStatistics(itemsToCheck);
+
+  console.log(`AI detected statistics in ${statisticsItems.length} items`);
+
+  // Tag the items
+  for (const item of statisticsItems) {
+    item.collections.push('Statistics');
+
+    // Update the item in storage
+    await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'updateItem', item }, (response) => {
+        if (response?.success) {
+          taggedCount++;
+        }
+        resolve();
+      });
+    });
   }
 
   // Reload items if any were tagged
@@ -484,30 +480,25 @@ async function startAIClustering() {
   btn.disabled = true;
 
   try {
-    // First, automatically tag statistics
-    console.log('Step 1: Detecting and tagging statistics...');
-    const statsTagged = await tagStatisticsInAllItems();
-    console.log(`Tagged ${statsTagged} items with Statistics collection`);
-
     // Access AI directly from popup using LanguageModel API
     const aiService = new window.AIClusteringService();
 
     // Check availability
-    console.log('Step 2: Checking AI availability...');
+    console.log('Step 1: Checking AI availability...');
     const availability = await aiService.isAvailable();
     console.log('Availability:', availability);
 
     if (!availability.available) {
-      // If AI not available but statistics were tagged, show success message
-      if (statsTagged > 0) {
-        alert(`✓ Tagged ${statsTagged} highlight${statsTagged !== 1 ? 's' : ''} with "Statistics"!\n\nAI Clustering is not available:\n\n${availability.reason}\n\nPlease ensure you have:\n- Chrome 127 or later\n- Enabled "Prompt API for Gemini Nano" in chrome://flags\n- Downloaded the Gemini Nano model in chrome://components`);
-      } else {
-        alert(`AI Clustering is not available:\n\n${availability.reason}\n\nPlease ensure you have:\n- Chrome 127 or later\n- Enabled "Prompt API for Gemini Nano" in chrome://flags\n- Downloaded the Gemini Nano model in chrome://components`);
-      }
+      alert(`AI Smart Collections is not available:\n\n${availability.reason}\n\nPlease ensure you have:\n- Chrome 127 or later\n- Enabled "Prompt API for Gemini Nano" in chrome://flags\n- Downloaded the Gemini Nano model in chrome://components`);
       return;
     }
 
-    console.log('Step 3: AI is available, starting clustering...');
+    // First, automatically tag statistics using AI
+    console.log('Step 2: Detecting and tagging statistics with AI...');
+    const statsTagged = await tagStatisticsInAllItems(aiService);
+    console.log(`Tagged ${statsTagged} items with Statistics collection`);
+
+    console.log('Step 3: AI is available, starting semantic clustering...');
 
     // Cluster items
     const suggestedCollections = await aiService.clusterItems(allItems);
