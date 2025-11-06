@@ -414,9 +414,58 @@ function formatDate(dateString) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// Detect if text contains statistics
+function containsStatistics(text) {
+  const patterns = [
+    /\d+\.?\d*%/,                           // Percentages: 50%, 23.5%
+    /\$\d+[\d,]*/,                          // Currency: $100, $1,000
+    /\d+[\d,]*\s*(million|billion|trillion|thousand)/i, // Large numbers
+    /\d+:\d+/,                              // Ratios: 3:1
+    /\d+\/\d+/,                             // Fractions: 5/10
+    /\d{1,3}(,\d{3})+(\.\d+)?/,            // Comma-separated numbers: 1,000 or 1,000.50
+    /\d+\.\d+/,                             // Decimal numbers: 3.14
+    /\b\d+\s*(years?|months?|days?|hours?|minutes?|seconds?)\b/i, // Time units
+    /(average|mean|median|total|sum|count|rate|growth|increase|decrease|decline)\s+of\s+\d+/i, // Statistical terms with numbers
+    /\b(approximately|roughly|about|around)\s+\d+/i // Approximate numbers
+  ];
+  return patterns.some(pattern => pattern.test(text));
+}
+
+// Tag all items that contain statistics
+async function tagStatisticsInAllItems() {
+  let taggedCount = 0;
+
+  for (const item of allItems) {
+    if (containsStatistics(item.value)) {
+      // Only add if not already tagged
+      if (!item.collections.includes('Statistics')) {
+        item.collections.push('Statistics');
+
+        // Update the item in storage
+        await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ action: 'updateItem', item }, (response) => {
+            if (response?.success) {
+              taggedCount++;
+            }
+            resolve();
+          });
+        });
+      }
+    }
+  }
+
+  // Reload items if any were tagged
+  if (taggedCount > 0) {
+    await loadItems();
+    await loadCollections();
+  }
+
+  return taggedCount;
+}
+
 // AI Clustering functionality
 async function startAIClustering() {
-  console.log('Starting AI clustering...');
+  console.log('Starting AI clustering and statistics detection...');
 
   if (allItems.length === 0) {
     alert('No highlights to cluster. Save some highlights first!');
@@ -435,20 +484,30 @@ async function startAIClustering() {
   btn.disabled = true;
 
   try {
+    // First, automatically tag statistics
+    console.log('Step 1: Detecting and tagging statistics...');
+    const statsTagged = await tagStatisticsInAllItems();
+    console.log(`Tagged ${statsTagged} items with Statistics collection`);
+
     // Access AI directly from popup using LanguageModel API
     const aiService = new window.AIClusteringService();
 
     // Check availability
-    console.log('Checking AI availability...');
+    console.log('Step 2: Checking AI availability...');
     const availability = await aiService.isAvailable();
     console.log('Availability:', availability);
 
     if (!availability.available) {
-      alert(`AI Clustering is not available:\n\n${availability.reason}\n\nPlease ensure you have:\n- Chrome 127 or later\n- Enabled "Prompt API for Gemini Nano" in chrome://flags\n- Downloaded the Gemini Nano model in chrome://components`);
+      // If AI not available but statistics were tagged, show success message
+      if (statsTagged > 0) {
+        alert(`✓ Tagged ${statsTagged} highlight${statsTagged !== 1 ? 's' : ''} with "Statistics"!\n\nAI Clustering is not available:\n\n${availability.reason}\n\nPlease ensure you have:\n- Chrome 127 or later\n- Enabled "Prompt API for Gemini Nano" in chrome://flags\n- Downloaded the Gemini Nano model in chrome://components`);
+      } else {
+        alert(`AI Clustering is not available:\n\n${availability.reason}\n\nPlease ensure you have:\n- Chrome 127 or later\n- Enabled "Prompt API for Gemini Nano" in chrome://flags\n- Downloaded the Gemini Nano model in chrome://components`);
+      }
       return;
     }
 
-    console.log('AI is available, starting clustering...');
+    console.log('Step 3: AI is available, starting clustering...');
 
     // Cluster items
     const suggestedCollections = await aiService.clusterItems(allItems);
@@ -456,12 +515,17 @@ async function startAIClustering() {
     console.log('Suggested collections:', suggestedCollections);
 
     if (!suggestedCollections || suggestedCollections.length === 0) {
-      alert('No meaningful collections could be identified. Try adding more diverse highlights.');
+      // Show statistics tagging result even if no AI collections found
+      if (statsTagged > 0) {
+        alert(`✓ Tagged ${statsTagged} highlight${statsTagged !== 1 ? 's' : ''} with "Statistics"!\n\nNo additional semantic collections could be identified. Try adding more diverse highlights.`);
+      } else {
+        alert('No meaningful collections could be identified. Try adding more diverse highlights.');
+      }
       return;
     }
 
-    // Show suggestions dialog
-    showCollectionSuggestionsDialog(suggestedCollections);
+    // Show suggestions dialog (will include statistics info)
+    showCollectionSuggestionsDialog(suggestedCollections, statsTagged);
 
     // Clean up
     await aiService.destroy();
@@ -476,18 +540,26 @@ async function startAIClustering() {
 }
 
 // Show collection suggestions dialog
-function showCollectionSuggestionsDialog(suggestedCollections) {
+function showCollectionSuggestionsDialog(suggestedCollections, statsTagged = 0) {
   // Create dialog
   const dialog = document.createElement('div');
   dialog.className = 'ai-suggestions-dialog';
+
+  const statsMessage = statsTagged > 0
+    ? `<p class="ai-suggestions-description" style="background: #e8f5e9; padding: 12px; border-radius: 6px; border-left: 4px solid #4caf50; margin-bottom: 12px;">
+        ✓ Tagged ${statsTagged} highlight${statsTagged !== 1 ? 's' : ''} with "Statistics" collection
+       </p>`
+    : '';
+
   dialog.innerHTML = `
     <div class="ai-suggestions-content">
       <div class="ai-suggestions-header">
-        <h2>AI Suggested Collections</h2>
+        <h2>AI Smart Collections</h2>
         <button class="close-btn" id="close-suggestions">✕</button>
       </div>
+      ${statsMessage}
       <p class="ai-suggestions-description">
-        Gemini Nano has analyzed your highlights and suggested these collections:
+        Gemini Nano has analyzed your highlights and suggested these semantic collections:
       </p>
       <div class="ai-suggestions-list" id="suggestions-list">
         <!-- Collections will be inserted here -->
