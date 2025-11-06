@@ -53,17 +53,17 @@ function handleTextSelection() {
 
 // Handle saving the highlight
 function handleSaveHighlight(e) {
-  console.log('handleSaveHighlight called');
+  console.log('=== NEWS HIGHLIGHTS: handleSaveHighlight called ===');
   e.preventDefault();
   e.stopPropagation();
 
   const selection = window.getSelection();
   const selectedText = selection.toString().trim();
 
-  console.log('Selected text:', selectedText);
+  console.log('NEWS HIGHLIGHTS: Selected text:', selectedText);
 
   if (selectedText.length === 0) {
-    console.log('No text selected');
+    console.log('NEWS HIGHLIGHTS: No text selected');
     return;
   }
 
@@ -81,12 +81,19 @@ function handleSaveHighlight(e) {
     updated_at: new Date().toISOString()
   };
 
+  console.log('NEWS HIGHLIGHTS: Checking if text contains statistics...');
+
   // Auto-tag with "Statistics" if the text contains statistics
-  if (containsStatistics(selectedText)) {
+  const hasStats = containsStatistics(selectedText);
+  console.log('NEWS HIGHLIGHTS: Contains statistics?', hasStats);
+
+  if (hasStats) {
     item.collections.push('Statistics');
+    console.log('NEWS HIGHLIGHTS: Added Statistics tag');
   }
 
-  console.log('Created item:', item);
+  console.log('NEWS HIGHLIGHTS: Created item:', item);
+  console.log('NEWS HIGHLIGHTS: Item collections:', item.collections);
 
   // Show collection selection dialog
   showCollectionDialog(item);
@@ -100,6 +107,8 @@ function generateId() {
 
 // Detect if text contains statistics
 function containsStatistics(text) {
+  console.log('NEWS HIGHLIGHTS: containsStatistics called with text:', text.substring(0, 100));
+
   // Check for various statistical patterns:
   // - Percentages (e.g., 50%, 23.5%)
   // - Numbers with units (e.g., $100, 5 million, 3.2 billion)
@@ -121,7 +130,9 @@ function containsStatistics(text) {
     /\b(approximately|roughly|about|around)\s+\d+/i // Approximate numbers
   ];
 
-  return patterns.some(pattern => pattern.test(text));
+  const result = patterns.some(pattern => pattern.test(text));
+  console.log('NEWS HIGHLIGHTS: Statistics detection result:', result);
+  return result;
 }
 
 // Show dialog for selecting collections/tags
