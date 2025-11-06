@@ -418,57 +418,89 @@ function formatDate(dateString) {
 async function tagStatisticsInAllItems(aiService) {
   let taggedCount = 0;
 
-  console.log('Detecting statistics using AI...');
+  console.log('>>> tagStatisticsInAllItems() called');
+  console.log('>>> Total allItems:', allItems.length);
+  console.log('>>> aiService:', aiService);
 
   // Get items that don't already have Statistics tag
   const itemsToCheck = allItems.filter(item => !item.collections.includes('Statistics'));
 
+  console.log('>>> Items WITHOUT Statistics tag:', itemsToCheck.length);
+  console.log('>>> Items to check:', itemsToCheck.map(i => ({
+    id: i.id,
+    value: i.value.substring(0, 50) + '...',
+    collections: i.collections
+  })));
+
   if (itemsToCheck.length === 0) {
-    console.log('All items already have Statistics tag');
+    console.log('>>> All items already have Statistics tag - RETURNING 0');
     return 0;
   }
 
-  console.log(`Checking ${itemsToCheck.length} items for statistics...`);
+  console.log(`>>> Calling aiService.detectStatistics() with ${itemsToCheck.length} items...`);
 
   // Use AI to detect statistics
   const statisticsItems = await aiService.detectStatistics(itemsToCheck);
 
-  console.log(`AI detected statistics in ${statisticsItems.length} items`);
+  console.log(`>>> AI RETURNED ${statisticsItems.length} items with statistics`);
+  console.log('>>> Statistics items:', statisticsItems.map(i => ({
+    id: i.id,
+    value: i.value.substring(0, 50) + '...'
+  })));
 
   // Tag the items
-  for (const item of statisticsItems) {
+  console.log('>>> Starting to tag items...');
+  for (let i = 0; i < statisticsItems.length; i++) {
+    const item = statisticsItems[i];
+    console.log(`>>> Tagging item ${i + 1}/${statisticsItems.length}: ${item.value.substring(0, 50)}...`);
+
     item.collections.push('Statistics');
+    console.log(`>>> Collections after push:`, item.collections);
 
     // Update the item in storage
+    console.log('>>> Sending updateItem message to background...');
     await new Promise((resolve) => {
       chrome.runtime.sendMessage({ action: 'updateItem', item }, (response) => {
+        console.log('>>> updateItem response:', response);
         if (response?.success) {
           taggedCount++;
+          console.log(`>>> SUCCESS: Tagged count now ${taggedCount}`);
+        } else {
+          console.log('>>> FAILED: Response was not successful');
         }
         resolve();
       });
     });
   }
 
+  console.log(`>>> Total tagged: ${taggedCount}`);
+
   // Reload items if any were tagged
   if (taggedCount > 0) {
+    console.log('>>> Reloading items and collections...');
     await loadItems();
     await loadCollections();
+    console.log('>>> Reload complete');
   }
 
+  console.log(`>>> RETURNING: ${taggedCount}`);
   return taggedCount;
 }
 
 // AI Clustering functionality
 async function startAIClustering() {
-  console.log('Starting AI clustering and statistics detection...');
+  console.log('===== AI SMART COLLECTIONS BUTTON CLICKED =====');
+  console.log('Total items loaded:', allItems.length);
+  console.log('Items:', allItems);
 
   if (allItems.length === 0) {
+    console.log('ERROR: No items found');
     alert('No highlights to cluster. Save some highlights first!');
     return;
   }
 
   if (allItems.length < 3) {
+    console.log('WARNING: Less than 3 items');
     alert('You need at least 3 highlights for AI clustering to work effectively.');
     return;
   }
@@ -481,24 +513,27 @@ async function startAIClustering() {
 
   try {
     // Access AI directly from popup using LanguageModel API
+    console.log('Creating AIClusteringService...');
     const aiService = new window.AIClusteringService();
+    console.log('AIClusteringService created:', aiService);
 
     // Check availability
-    console.log('Step 1: Checking AI availability...');
+    console.log('===== STEP 1: Checking AI availability =====');
     const availability = await aiService.isAvailable();
-    console.log('Availability:', availability);
+    console.log('Availability result:', availability);
 
     if (!availability.available) {
+      console.log('ERROR: AI not available:', availability.reason);
       alert(`AI Smart Collections is not available:\n\n${availability.reason}\n\nPlease ensure you have:\n- Chrome 127 or later\n- Enabled "Prompt API for Gemini Nano" in chrome://flags\n- Downloaded the Gemini Nano model in chrome://components`);
       return;
     }
 
     // First, automatically tag statistics using AI
-    console.log('Step 2: Detecting and tagging statistics with AI...');
+    console.log('===== STEP 2: Detecting and tagging statistics with AI =====');
     const statsTagged = await tagStatisticsInAllItems(aiService);
-    console.log(`Tagged ${statsTagged} items with Statistics collection`);
+    console.log(`✓ Tagged ${statsTagged} items with Statistics collection`);
 
-    console.log('Step 3: AI is available, starting semantic clustering...');
+    console.log('===== STEP 3: Starting semantic clustering =====');
 
     // Cluster items
     const suggestedCollections = await aiService.clusterItems(allItems);
